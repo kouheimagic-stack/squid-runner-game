@@ -39,6 +39,11 @@
       overflow: hidden;
     }
 
+    body.ui-title,
+    body.ui-gameover {
+      overflow: hidden;
+    }
+
     .game-shell {
       width: min(980px, 100%);
       border: 1px solid var(--line);
@@ -139,7 +144,30 @@
       -webkit-overflow-scrolling: touch;
     }
 
+    .title-overlay,
+    .gameover-overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      border-radius: 14px;
+      background:
+        linear-gradient(180deg, rgba(2, 6, 23, 0.6), rgba(2, 6, 23, 0.84)),
+        radial-gradient(circle at 20% 15%, rgba(34, 211, 238, 0.16), transparent 40%);
+      transition: opacity 180ms ease, transform 180ms ease;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
     .start-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(1.02);
+    }
+
+    .title-overlay.hidden,
+    .gameover-overlay.hidden {
       opacity: 0;
       pointer-events: none;
       transform: scale(1.02);
@@ -155,6 +183,85 @@
       max-height: min(86vh, 760px);
       overflow: auto;
       overscroll-behavior: contain;
+    }
+
+    .title-panel,
+    .gameover-panel {
+      width: min(910px, 100%);
+      border: 1px solid rgba(96, 165, 250, 0.3);
+      border-radius: 16px;
+      background: rgba(2, 6, 23, 0.84);
+      padding: 14px;
+      box-shadow: 0 20px 40px rgba(2, 6, 23, 0.62);
+    }
+
+    .title-panel {
+      max-height: min(86vh, 760px);
+      overflow: auto;
+    }
+
+    .title-lead {
+      margin: 0 0 10px;
+      color: #cbd5e1;
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+
+    .title-gallery {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .title-skin {
+      border: 1px solid rgba(100, 116, 139, 0.42);
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.62);
+      padding: 8px;
+      text-align: center;
+    }
+
+    .title-skin img {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: contain;
+      display: block;
+      border-radius: 8px;
+      background: rgba(2, 6, 23, 0.58);
+      margin-bottom: 6px;
+    }
+
+    .title-skin-name {
+      font-size: 0.8rem;
+      color: #e2e8f0;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .title-actions,
+    .gameover-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .title-actions button,
+    .gameover-actions button {
+      flex: 1 1 170px;
+    }
+
+    .inline-btn {
+      width: 100%;
+      margin-top: 8px;
+      border-radius: 10px;
+      padding: 8px 10px;
+      box-shadow: none;
+      background: rgba(30, 41, 59, 0.72);
+      border: 1px solid rgba(100, 116, 139, 0.46);
+      font-size: 0.82rem;
     }
 
     .badge {
@@ -273,6 +380,17 @@
       font-weight: 700;
       font-size: 0.9rem;
       margin-bottom: 2px;
+    }
+
+    .skin-icon-img {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+      display: block;
+      flex: 0 0 auto;
+      border-radius: 6px;
+      background: rgba(2, 6, 23, 0.5);
+      padding: 2px;
     }
 
     .skin-desc {
@@ -440,6 +558,23 @@
       font-size: 0.75rem;
     }
 
+    .gameover-title {
+      margin: 2px 0 8px;
+      font-size: clamp(1.2rem, 3vw, 1.6rem);
+      color: #f8fafc;
+    }
+
+    .gameover-title.new-record {
+      color: #facc15;
+      text-shadow: 0 0 14px rgba(250, 204, 21, 0.42);
+    }
+
+    .gameover-message {
+      margin: 0 0 12px;
+      color: #cbd5e1;
+      font-size: 0.96rem;
+    }
+
     @media (max-width: 860px) {
       body {
         padding: 10px;
@@ -452,6 +587,10 @@
 
       .start-grid {
         grid-template-columns: 1fr;
+      }
+
+      .title-gallery {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
       .ranking-list {
@@ -509,7 +648,27 @@
         overscroll-behavior: contain;
       }
 
+      .title-overlay,
+      .gameover-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 95;
+        display: block;
+        border-radius: 0;
+        padding: calc(8px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom));
+        overflow-y: auto;
+        overscroll-behavior: contain;
+      }
+
       .start-panel {
+        width: min(760px, 100%);
+        margin: 0 auto;
+        max-height: none;
+        overflow: visible;
+      }
+
+      .title-panel,
+      .gameover-panel {
         width: min(760px, 100%);
         margin: 0 auto;
         max-height: none;
@@ -528,7 +687,12 @@
       }
 
       .start-overlay {
-        padding: 10px;
+        padding: calc(10px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom));
+      }
+
+      .title-overlay,
+      .gameover-overlay {
+        padding: calc(10px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom));
       }
 
       .start-panel {
@@ -539,6 +703,11 @@
         grid-template-columns: 1fr;
       }
 
+      .title-gallery {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
       .ranking-row {
         grid-template-columns: auto 1fr;
       }
@@ -546,6 +715,45 @@
       .ranking-score {
         grid-column: 2;
         justify-self: end;
+      }
+    }
+
+    @media (max-height: 560px) and (orientation: landscape) {
+      body {
+        padding: 6px;
+      }
+
+      .game-shell {
+        width: min(1200px, 100%);
+        padding: 8px;
+      }
+
+      .hud {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+
+      .card {
+        padding: 6px 7px;
+      }
+
+      .label {
+        font-size: 0.7rem;
+      }
+
+      .value {
+        font-size: clamp(0.95rem, 2.6vw, 1.2rem);
+      }
+
+      .footer {
+        margin-top: 8px;
+        font-size: 0.78rem;
+      }
+
+      .touch-jump {
+        min-height: 52px;
+        font-size: 1rem;
       }
     }
   </style>
@@ -575,7 +783,19 @@
     <section class="arena">
       <canvas id="game" width="960" height="540" aria-label="Squid obstacle game"></canvas>
 
-      <div class="start-overlay" id="startScreen">
+      <div class="title-overlay" id="titleScreen">
+        <div class="title-panel">
+          <p class="badge">SQUID DRIFT</p>
+          <h1 class="start-title">TITLE SCREEN</h1>
+          <p class="title-lead" id="titleMessage">4タイプのイカで深海を駆け抜けろ。スマホは横画面プレイ推奨。</p>
+          <div class="title-gallery" id="titleSkinGallery"></div>
+          <div class="title-actions">
+            <button id="titleStartBtn" type="button">スタート画面へ</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="start-overlay hidden" id="startScreen">
         <div class="start-panel">
           <p class="badge">SQUID DRIFT</p>
           <h1 class="start-title" id="startTitle">START SCREEN</h1>
@@ -591,6 +811,7 @@
               <div class="skin-options" id="skinOptions"></div>
 
               <button class="start-btn" id="startBtn" type="button">ゲーム開始</button>
+              <button id="titleBtn" class="inline-btn" type="button">タイトルへ戻る</button>
               <p class="hint">操作: Space / ↑ / W / 画面タップ / JUMP。Sでミニ化、+で加点、Iを3つ集めると10pt無敵。</p>
             </section>
 
@@ -601,6 +822,19 @@
               </div>
               <ol class="ranking-list" id="rankingList"></ol>
             </section>
+          </div>
+        </div>
+      </div>
+
+      <div class="gameover-overlay hidden" id="gameOverScreen">
+        <div class="gameover-panel">
+          <p class="badge">MISSION RESULT</p>
+          <h2 class="gameover-title" id="gameOverTitle">GAME OVER</h2>
+          <p class="gameover-message" id="gameOverMessage"></p>
+          <div class="gameover-actions">
+            <button id="retryBtn" type="button">再挑戦</button>
+            <button id="goStartBtn" type="button">スタート画面</button>
+            <button id="goTitleBtn" type="button">タイトル画面</button>
           </div>
         </div>
       </div>
@@ -625,10 +859,21 @@
       const pilotEl = document.getElementById("pilotText");
       const shieldCountEl = document.getElementById("shieldCount");
       const shieldStatusEl = document.getElementById("shieldStatus");
+      const titleScreenEl = document.getElementById("titleScreen");
+      const titleMessageEl = document.getElementById("titleMessage");
+      const titleSkinGalleryEl = document.getElementById("titleSkinGallery");
+      const titleStartBtn = document.getElementById("titleStartBtn");
+      const titleBtn = document.getElementById("titleBtn");
       const startTitleEl = document.getElementById("startTitle");
       const newRecordNoteEl = document.getElementById("newRecordNote");
       const startScreenEl = document.getElementById("startScreen");
       const startMessageEl = document.getElementById("startMessage");
+      const gameOverScreenEl = document.getElementById("gameOverScreen");
+      const gameOverTitleEl = document.getElementById("gameOverTitle");
+      const gameOverMessageEl = document.getElementById("gameOverMessage");
+      const retryBtn = document.getElementById("retryBtn");
+      const goStartBtn = document.getElementById("goStartBtn");
+      const goTitleBtn = document.getElementById("goTitleBtn");
       const playerNameInput = document.getElementById("playerName");
       const skinOptionsEl = document.getElementById("skinOptions");
       const rankingListEl = document.getElementById("rankingList");
@@ -656,6 +901,8 @@
       const BONUS_SCORE = 2;
       const INVINCIBLE_CORE_REQUIRED = 3;
       const INVINCIBLE_POINTS = 10;
+      const MOBILE_RADIUS_SCALE = 0.78;
+      const MOBILE_RENDER_SCALE = 0.8;
       const PHASE_INTERVAL = 30;
       const NEAR_MISS_THRESHOLD = 18;
       const COMBO_TIMEOUT_FRAMES = 172;
@@ -674,6 +921,7 @@
           id: "neo",
           name: "ネオン",
           emoji: "🦑",
+          image: "assets/skins/neon.png",
           desc: "標準バランス",
           stats: "上昇:中 / 落下:中 / 判定:中",
           boost: BASE_BOOST,
@@ -688,6 +936,7 @@
           id: "swift",
           name: "ストライカー",
           emoji: "🦑⚡",
+          image: "assets/skins/striker.png",
           desc: "急上昇タイプ",
           stats: "上昇:強 / 落下:速 / 判定:小",
           boost: BASE_BOOST - 2.35,
@@ -702,6 +951,7 @@
           id: "drift",
           name: "ドリフター",
           emoji: "🦑🌙",
+          image: "assets/skins/drifter.png",
           desc: "ふわふわ滑空",
           stats: "上昇:弱 / 落下:遅 / 判定:大",
           boost: BASE_BOOST + 1.05,
@@ -716,6 +966,7 @@
           id: "phantom",
           name: "ファントム",
           emoji: "🦑💠",
+          image: "assets/skins/phantom.png",
           desc: "当たり判定が小さい",
           stats: "上昇:やや強 / 落下:中 / 判定:極小",
           boost: BASE_BOOST - 0.9,
@@ -777,7 +1028,7 @@
       let frame = 0;
       let score = 0;
       let speed = 4;
-      let state = "menu";
+      let state = "title";
       let obstacles = [];
       let items = [];
       let particles = [];
@@ -801,6 +1052,11 @@
       let bgmTimerId = null;
       let bgmStep = 0;
       let lastInvincibleBounceFrame = -120;
+      let isMobileViewport = window.matchMedia("(max-width: 860px)").matches;
+      let resultMessage = "";
+      let resultIsNewRecord = false;
+      let resultScore = 0;
+      const skinImages = new Map();
       const stars = createStars(72);
 
       const player = {
@@ -823,30 +1079,64 @@
       let currentSkinId = isValidSkinId(savedSkin) ? savedSkin : SQUID_SKINS[0].id;
       let currentSkin = getSkin(currentSkinId);
 
+      preloadSkinImages();
       highScoreEl.textContent = String(highScore);
       updatePilotHud();
       updateShieldHud();
+      renderTitleSkinGallery();
       renderSkinOptions();
       renderRanking();
-      showStartScreen("名前を登録して、ミッションを開始。");
       resetRound(true);
+      hideStartScreen();
+      hideGameOverScreen();
+      showTitleScreen("4タイプのイカで深海を駆け抜けろ。スマホは横画面プレイ推奨。");
       syncUiState();
 
+      titleStartBtn.addEventListener("click", () => {
+        unlockAudio();
+        playMenuSelectSfx();
+        enterSetupMenu("名前を登録して、ミッションを開始。");
+      });
       startBtn.addEventListener("click", startGame);
+      titleBtn.addEventListener("click", () => {
+        unlockAudio();
+        playMenuSelectSfx();
+        enterTitleScreen("4タイプのイカで深海を駆け抜けろ。");
+      });
       menuBtn.addEventListener("click", () => {
         unlockAudio();
         playMenuSelectSfx();
         if (state === "running" || state === "countdown") {
           returnToMenu("スタート画面に戻りました。");
+        } else if (state === "title") {
+          showTitleScreen("4タイプのイカで深海を駆け抜けろ。スマホは横画面プレイ推奨。");
+        } else if (state === "gameover") {
+          returnToMenu("スタート画面に戻りました。");
         } else {
           showStartScreen("名前を登録して、ミッションを開始。");
         }
+      });
+      retryBtn.addEventListener("click", startRetryFromGameOver);
+      goStartBtn.addEventListener("click", () => {
+        unlockAudio();
+        playMenuSelectSfx();
+        returnToMenu(
+          resultMessage || "スタート画面に戻りました。",
+          MENU_LOCK_MS_AFTER_GAMEOVER,
+          resultIsNewRecord ? { newRecord: true, score: resultScore } : {}
+        );
+      });
+      goTitleBtn.addEventListener("click", () => {
+        unlockAudio();
+        playMenuSelectSfx();
+        enterTitleScreen("4タイプのイカで深海を駆け抜けろ。");
       });
       clearRankBtn.addEventListener("click", () => {
         unlockAudio();
         playMenuSelectSfx();
         clearRanking();
       });
+      window.addEventListener("resize", handleViewportChange);
       window.addEventListener("keydown", onKeyDown);
       canvas.addEventListener("pointerdown", onTap);
       jumpBtn.addEventListener("pointerdown", onTap);
@@ -863,11 +1153,67 @@
         }));
       }
 
+      function handleViewportChange() {
+        isMobileViewport = window.matchMedia("(max-width: 860px)").matches;
+      }
+
+      function preloadSkinImages() {
+        for (const skin of SQUID_SKINS) {
+          if (!skin.image) continue;
+          const image = new Image();
+          image.decoding = "async";
+          image.src = skin.image;
+          skinImages.set(skin.id, image);
+        }
+      }
+
+      function getSkinImage(skinId) {
+        return skinImages.get(skinId) || null;
+      }
+
+      function renderTitleSkinGallery() {
+        titleSkinGalleryEl.innerHTML = "";
+        for (const skin of SQUID_SKINS) {
+          const card = document.createElement("article");
+          card.className = "title-skin";
+
+          const image = document.createElement("img");
+          image.src = skin.image;
+          image.alt = `${skin.name} squid`;
+          image.loading = "lazy";
+          image.decoding = "async";
+
+          const name = document.createElement("div");
+          name.className = "title-skin-name";
+          name.textContent = skin.name;
+
+          card.appendChild(image);
+          card.appendChild(name);
+          titleSkinGalleryEl.appendChild(card);
+        }
+      }
+
       function onKeyDown(event) {
+        if (event.code === "Enter" && state === "title") {
+          event.preventDefault();
+          unlockAudio();
+          enterSetupMenu("名前を登録して、ミッションを開始。");
+          return;
+        }
         if (event.code === "Enter" && state === "menu") {
           event.preventDefault();
           unlockAudio();
           startGame();
+          return;
+        }
+        if (event.code === "Enter" && state === "gameover") {
+          event.preventDefault();
+          unlockAudio();
+          startRetryFromGameOver();
+          return;
+        }
+        if (state === "title") {
+          if (["Space", "ArrowUp", "KeyW"].includes(event.code)) event.preventDefault();
           return;
         }
         if (state === "menu") {
@@ -917,6 +1263,8 @@
         countdownValue = COUNTDOWN_SECONDS;
         lastCountdownTickValue = COUNTDOWN_SECONDS + 1;
         hideStartScreen();
+        hideGameOverScreen();
+        hideTitleScreen();
         resetRound(true);
         updatePilotHud();
         playStartSfx();
@@ -953,7 +1301,37 @@
         syncUiState();
         menuInputLockUntil = Math.max(menuInputLockUntil, performance.now() + lockMs);
         resetRound(true);
+        hideTitleScreen();
+        hideGameOverScreen();
         showStartScreen(message, screenOptions);
+      }
+
+      function enterSetupMenu(message = "名前を登録して、ミッションを開始。") {
+        state = "menu";
+        syncUiState();
+        resetRound(true);
+        hideTitleScreen();
+        hideGameOverScreen();
+        showStartScreen(message);
+      }
+
+      function enterTitleScreen(message = "4タイプのイカで深海を駆け抜けろ。スマホは横画面プレイ推奨。") {
+        stopBgm();
+        state = "title";
+        syncUiState();
+        resetRound(true);
+        hideStartScreen();
+        hideGameOverScreen();
+        showTitleScreen(message);
+      }
+
+      function showTitleScreen(message) {
+        titleMessageEl.textContent = message;
+        titleScreenEl.classList.remove("hidden");
+      }
+
+      function hideTitleScreen() {
+        titleScreenEl.classList.add("hidden");
       }
 
       function showStartScreen(message, options = {}) {
@@ -970,6 +1348,8 @@
           newRecordNoteEl.textContent = "NEW RECORD ACHIEVED";
         }
         startMessageEl.textContent = message;
+        hideTitleScreen();
+        hideGameOverScreen();
         startScreenEl.classList.remove("hidden");
       }
 
@@ -977,11 +1357,47 @@
         startScreenEl.classList.add("hidden");
       }
 
+      function showGameOverScreen(message, isNewRecord, scoreValue) {
+        resultMessage = message;
+        resultIsNewRecord = Boolean(isNewRecord);
+        resultScore = scoreValue;
+        gameOverTitleEl.textContent = resultIsNewRecord ? "NEW RECORD!" : "GAME OVER";
+        gameOverTitleEl.classList.toggle("new-record", resultIsNewRecord);
+        gameOverMessageEl.textContent = message;
+        hideStartScreen();
+        hideTitleScreen();
+        gameOverScreenEl.classList.remove("hidden");
+      }
+
+      function hideGameOverScreen() {
+        gameOverScreenEl.classList.add("hidden");
+      }
+
+      function startRetryFromGameOver() {
+        if (state !== "gameover") return;
+        unlockAudio();
+        playMenuSelectSfx();
+        state = "countdown";
+        syncUiState();
+        countdownStartedAt = performance.now();
+        countdownValue = COUNTDOWN_SECONDS;
+        lastCountdownTickValue = COUNTDOWN_SECONDS + 1;
+        hideGameOverScreen();
+        resetRound(true);
+        updatePilotHud();
+        playStartSfx();
+        startBgm();
+      }
+
       function syncUiState() {
         const playing = state === "running" || state === "countdown";
         const menu = state === "menu";
+        const title = state === "title";
+        const gameover = state === "gameover";
         document.body.classList.toggle("ui-playing", playing);
         document.body.classList.toggle("ui-menu", menu);
+        document.body.classList.toggle("ui-title", title);
+        document.body.classList.toggle("ui-gameover", gameover);
       }
 
       function spawnObstacle() {
@@ -1406,12 +1822,11 @@
         const message = reason === "スコア"
           ? `${currentName} のスコア: ${score}`
           : `${reason} / ${currentName} のスコア: ${score}`;
+        stopBgm();
+        state = "gameover";
+        syncUiState();
+        showGameOverScreen(message, isNewRecord, score);
         playGameOverSfx();
-        returnToMenu(
-          message,
-          MENU_LOCK_MS_AFTER_GAMEOVER,
-          isNewRecord ? { newRecord: true, score } : {}
-        );
       }
 
       function registerRanking() {
@@ -1484,7 +1899,7 @@
 
           const name = document.createElement("div");
           name.className = "ranking-name";
-          name.textContent = `${skin.emoji} ${entry.name}`;
+          name.textContent = entry.name;
 
           const meta = document.createElement("div");
           meta.className = "ranking-meta";
@@ -1512,7 +1927,19 @@
 
           const title = document.createElement("div");
           title.className = "skin-title";
-          title.textContent = `${skin.emoji} ${skin.name}`;
+
+          const icon = document.createElement("img");
+          icon.className = "skin-icon-img";
+          icon.src = skin.image;
+          icon.alt = `${skin.name} icon`;
+          icon.loading = "lazy";
+          icon.decoding = "async";
+
+          const titleText = document.createElement("span");
+          titleText.textContent = skin.name;
+
+          title.appendChild(icon);
+          title.appendChild(titleText);
 
           const desc = document.createElement("div");
           desc.className = "skin-desc";
@@ -1539,7 +1966,7 @@
       }
 
       function updatePilotHud() {
-        pilotEl.textContent = `${currentSkin.emoji} ${currentName}`;
+        pilotEl.textContent = `${currentSkin.name} / ${currentName}`;
       }
 
       function draw() {
@@ -1789,8 +2216,10 @@
       function drawPlayer() {
         const collisionRadius = getCurrentCollisionRadius();
         const auraRadius = 16 + collisionRadius * 0.9;
-        const renderScale = isShrinkActive() ? 0.76 : 1;
+        const mobileScale = isMobileViewport ? MOBILE_RENDER_SCALE : 1;
+        const renderScale = (isShrinkActive() ? 0.76 : 1) * mobileScale;
         const invincible = isInvincibleActive();
+        const skinImage = getSkinImage(currentSkin.id);
 
         ctx.save();
         ctx.translate(player.x, player.y);
@@ -1819,10 +2248,15 @@
 
         ctx.shadowColor = invincible ? "rgba(251, 191, 36, 0.98)" : currentSkin.glow;
         ctx.shadowBlur = 20;
-        ctx.font = `${Math.round(42 * renderScale)}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(currentSkin.emoji, 0, 0);
+        if (skinImage && skinImage.complete && skinImage.naturalWidth > 0) {
+          const spriteSize = 86 * renderScale;
+          ctx.drawImage(skinImage, -spriteSize * 0.5, -spriteSize * 0.5, spriteSize, spriteSize);
+        } else {
+          ctx.font = `${Math.round(42 * renderScale)}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(currentSkin.emoji, 0, 0);
+        }
         ctx.restore();
       }
 
@@ -2103,7 +2537,8 @@
       }
 
       function getCurrentCollisionRadius() {
-        const base = PLAYER_SIZE * currentSkin.radiusScale;
+        const mobileScale = isMobileViewport ? MOBILE_RADIUS_SCALE : 1;
+        const base = PLAYER_SIZE * currentSkin.radiusScale * mobileScale;
         return isShrinkActive() ? base * SHRINK_RADIUS_SCALE : base;
       }
 
