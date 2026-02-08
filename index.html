@@ -1356,6 +1356,7 @@
       let onlineStatus = "idle";
       let onlineStatusMessage = "ONLINE 接続待機";
       let onlineSyncInFlight = false;
+      let lastLocalEntry = null;
       let endingFrames = 0;
       let endingCatchPlayed = false;
       let audioCtx = null;
@@ -1471,7 +1472,14 @@
       syncRankBtn.addEventListener("click", () => {
         unlockAudio();
         playMenuSelectSfx();
-        void fetchOnlineRanking(true);
+        rankingViewMode = "online";
+        renderRanking();
+        const entryToSync = lastLocalEntry || ranking[0];
+        if (entryToSync) {
+          void syncOnlineRankingWithEntry(entryToSync);
+        } else {
+          void fetchOnlineRanking(true);
+        }
       });
       window.addEventListener("resize", handleViewportChange);
       window.addEventListener("keydown", onKeyDown);
@@ -2371,12 +2379,14 @@
         };
         ranking = sanitizeRankingEntries([...ranking, entry]);
         localStorage.setItem(RANKING_KEY, JSON.stringify(ranking));
+        lastLocalEntry = entry;
         return entry;
       }
 
       function clearRanking() {
         ranking = [];
         rankingViewMode = "local";
+        lastLocalEntry = null;
         localStorage.removeItem(RANKING_KEY);
         highScore = 0;
         highScoreEl.textContent = "0";
