@@ -667,12 +667,18 @@
 
     @media (max-width: 860px) {
       body {
-        padding: 10px;
+        display: block;
+        min-height: 100dvh;
+        padding: 0;
       }
 
       .game-shell {
-        padding: 10px;
-        border-radius: 16px;
+        width: 100%;
+        min-height: 100dvh;
+        padding: calc(8px + env(safe-area-inset-top)) 8px calc(8px + env(safe-area-inset-bottom));
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
       }
 
       .start-grid {
@@ -831,12 +837,17 @@
 
     @media (max-height: 560px) and (orientation: landscape) {
       body {
-        padding: 6px;
+        display: block;
+        padding: 0;
       }
 
       .game-shell {
-        width: min(1200px, 100%);
+        width: 100%;
+        min-height: 100dvh;
         padding: 8px;
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
       }
 
       .hud {
