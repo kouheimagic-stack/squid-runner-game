@@ -441,6 +441,49 @@
       margin-bottom: 12px;
     }
 
+    .difficulty-options {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .difficulty-btn {
+      border: 1px solid rgba(100, 116, 139, 0.45);
+      border-radius: 10px;
+      padding: 8px 8px;
+      background: rgba(2, 6, 23, 0.65);
+      color: #e2e8f0;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 120ms ease, transform 120ms ease, background-color 120ms ease;
+      min-height: 68px;
+    }
+
+    .difficulty-btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(34, 211, 238, 0.62);
+    }
+
+    .difficulty-btn.active {
+      border-color: rgba(34, 211, 238, 0.95);
+      background: rgba(8, 47, 73, 0.78);
+      box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.2);
+    }
+
+    .difficulty-name {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+
+    .difficulty-desc {
+      display: block;
+      font-size: 0.73rem;
+      color: #94a3b8;
+    }
+
     .skin-btn {
       border: 1px solid rgba(100, 116, 139, 0.45);
       border-radius: 10px;
@@ -513,6 +556,29 @@
       align-items: center;
       gap: 8px;
       margin-bottom: 8px;
+    }
+
+    .ranking-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .rank-tab.active {
+      border-color: rgba(34, 211, 238, 0.9);
+      background: rgba(8, 47, 73, 0.86);
+      box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.25);
+    }
+
+    .ranking-status {
+      margin: 0 0 8px;
+      font-size: 0.74rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #67e8f9;
+      min-height: 1.1em;
     }
 
     .ranking-title {
@@ -807,6 +873,10 @@
         grid-template-columns: 1fr;
       }
 
+      .difficulty-options {
+        grid-template-columns: 1fr;
+      }
+
       .title-gallery {
         grid-template-columns: 1fr 1fr;
         gap: 8px;
@@ -832,6 +902,14 @@
       .ranking-score {
         grid-column: 2;
         justify-self: end;
+      }
+
+      .ranking-head {
+        align-items: flex-start;
+      }
+
+      .ranking-controls {
+        justify-content: flex-start;
       }
     }
 
@@ -938,16 +1016,25 @@
               <span class="field-label">🦑 タイプ選択</span>
               <div class="skin-options" id="skinOptions"></div>
 
+              <span class="field-label">難易度</span>
+              <div class="difficulty-options" id="difficultyOptions"></div>
+
               <button class="start-btn" id="startBtn" type="button">ゲーム開始</button>
               <button id="titleBtn" class="inline-btn" type="button">タイトルへ戻る</button>
-              <p class="hint">操作: Space / ↑ / W / 画面タップ / JUMP。Sでミニ化、+で加点、Iを3つ集めると10pt無敵。</p>
+              <p class="hint">操作: Space / ↑ / W / 画面タップ / JUMP。開幕チュートリアル中は安全地帯。Sでミニ化、+で加点、Iを3つ集めると10pt無敵。</p>
             </section>
 
             <section class="ranking-panel">
               <div class="ranking-head">
                 <h2 class="ranking-title">Ranking</h2>
-                <button class="ghost-btn" id="clearRankBtn" type="button">記録リセット</button>
+                <div class="ranking-controls">
+                  <button class="ghost-btn rank-tab" id="localRankTab" type="button">Local</button>
+                  <button class="ghost-btn rank-tab" id="onlineRankTab" type="button">Online</button>
+                  <button class="ghost-btn" id="syncRankBtn" type="button">同期</button>
+                  <button class="ghost-btn" id="clearRankBtn" type="button">記録リセット</button>
+                </div>
               </div>
+              <p class="ranking-status" id="rankingStatus">LOCAL</p>
               <ol class="ranking-list" id="rankingList"></ol>
             </section>
           </div>
@@ -1004,7 +1091,12 @@
       const goTitleBtn = document.getElementById("goTitleBtn");
       const playerNameInput = document.getElementById("playerName");
       const skinOptionsEl = document.getElementById("skinOptions");
+      const difficultyOptionsEl = document.getElementById("difficultyOptions");
       const rankingListEl = document.getElementById("rankingList");
+      const rankingStatusEl = document.getElementById("rankingStatus");
+      const localRankTabBtn = document.getElementById("localRankTab");
+      const onlineRankTabBtn = document.getElementById("onlineRankTab");
+      const syncRankBtn = document.getElementById("syncRankBtn");
       const startBtn = document.getElementById("startBtn");
       const menuBtn = document.getElementById("menuBtn");
       const clearRankBtn = document.getElementById("clearRankBtn");
@@ -1012,11 +1104,11 @@
 
       const WIDTH = canvas.width;
       const HEIGHT = canvas.height;
-      const PLAYER_X = 220;
+      const PLAYER_X = 198;
       const PLAYER_SIZE = 44;
-      const OBSTACLE_WIDTH = 95;
-      const BASE_GRAVITY = 0.42;
-      const BASE_BOOST = -8.1;
+      const OBSTACLE_WIDTH = 80;
+      const BASE_GRAVITY = 0.29;
+      const BASE_BOOST = -8.4;
       const MILESTONE_INTERVAL = 10;
       const MILESTONE_FX_FRAMES = 76;
       const MENU_LOCK_MS_AFTER_GAMEOVER = 700;
@@ -1031,7 +1123,7 @@
       const INVINCIBLE_POINTS = 10;
       const MOBILE_RADIUS_SCALE = 0.65;
       const MOBILE_RENDER_SCALE = 0.7;
-      const PHASE_INTERVAL = 30;
+      const PHASE_INTERVAL = 70;
       const NEAR_MISS_THRESHOLD = 18;
       const COMBO_TIMEOUT_FRAMES = 172;
       const BGM_BPM = 132;
@@ -1042,7 +1134,72 @@
       const RANKING_KEY = "squid_drift_ranking_v1";
       const NAME_KEY = "squid_drift_player_name_v1";
       const SKIN_KEY = "squid_drift_skin_v1";
+      const DIFFICULTY_KEY = "squid_drift_difficulty_v1";
       const MAX_RANKING = 10;
+      const ONLINE_RANKING_URL = "https://jsonblob.com/api/jsonBlob/019c3cc3-8ea1-7fcc-812f-d4b703d31169";
+
+      const DIFFICULTIES = [
+        {
+          id: "easy",
+          name: "EASY",
+          desc: "速度- / 判定ゆるめ",
+          speedScale: 0.84,
+          speedCapScale: 0.9,
+          spawnScale: 1.22,
+          gapBonus: 44,
+          tightenScale: 0.82,
+          marginBonus: 10,
+          motionScale: 0.76,
+          gateScale: 0.72,
+          dynamicGapBonus: 20,
+          mineScale: 0.76,
+          hitboxScale: 0.88,
+          gravityScale: 0.94,
+          boostScale: 1.08,
+          phaseScale: 1.35,
+          tutorialSeconds: 6
+        },
+        {
+          id: "normal",
+          name: "NORMAL",
+          desc: "標準バランス",
+          speedScale: 1,
+          speedCapScale: 1,
+          spawnScale: 1,
+          gapBonus: 0,
+          tightenScale: 1,
+          marginBonus: 0,
+          motionScale: 1,
+          gateScale: 1,
+          dynamicGapBonus: 0,
+          mineScale: 1,
+          hitboxScale: 1,
+          gravityScale: 1,
+          boostScale: 1,
+          phaseScale: 1,
+          tutorialSeconds: 5
+        },
+        {
+          id: "hard",
+          name: "HARD",
+          desc: "高速 / 高密度",
+          speedScale: 1.16,
+          speedCapScale: 1.2,
+          spawnScale: 0.88,
+          gapBonus: -24,
+          tightenScale: 1.24,
+          marginBonus: -8,
+          motionScale: 1.24,
+          gateScale: 1.22,
+          dynamicGapBonus: -18,
+          mineScale: 1.18,
+          hitboxScale: 1.08,
+          gravityScale: 1.06,
+          boostScale: 0.96,
+          phaseScale: 0.76,
+          tutorialSeconds: 4
+        }
+      ];
 
       const SQUID_SKINS = [
         {
@@ -1167,6 +1324,7 @@
       let countdownStartedAt = 0;
       let countdownValue = COUNTDOWN_SECONDS;
       let lastCountdownTickValue = COUNTDOWN_SECONDS + 1;
+      let tutorialStartFrame = 0;
       let shrinkUntilScore = 0;
       let invincibleCoreCount = 0;
       let invincibleUntilScore = 0;
@@ -1174,6 +1332,11 @@
       let comboCount = 0;
       let comboExpireFrame = 0;
       let nextItemSpawnFrame = 0;
+      let rankingViewMode = "online";
+      let onlineRanking = [];
+      let onlineStatus = "idle";
+      let onlineStatusMessage = "ONLINE 接続待機";
+      let onlineSyncInFlight = false;
       let audioCtx = null;
       let sfxGainNode = null;
       let bgmGainNode = null;
@@ -1206,6 +1369,9 @@
       const savedSkin = String(localStorage.getItem(SKIN_KEY) || "");
       let currentSkinId = isValidSkinId(savedSkin) ? savedSkin : SQUID_SKINS[0].id;
       let currentSkin = getSkin(currentSkinId);
+      const savedDifficulty = String(localStorage.getItem(DIFFICULTY_KEY) || "normal");
+      let currentDifficultyId = isValidDifficultyId(savedDifficulty) ? savedDifficulty : "normal";
+      let currentDifficulty = getDifficulty(currentDifficultyId);
 
       preloadSkinImages();
       highScoreEl.textContent = String(highScore);
@@ -1213,7 +1379,9 @@
       updateShieldHud();
       renderTitleSkinGallery();
       renderSkinOptions();
+      renderDifficultyOptions();
       renderRanking();
+      void fetchOnlineRanking();
       resetRound(true);
       hideStartScreen();
       hideGameOverScreen();
@@ -1263,6 +1431,23 @@
         unlockAudio();
         playMenuSelectSfx();
         clearRanking();
+      });
+      localRankTabBtn.addEventListener("click", () => {
+        unlockAudio();
+        playMenuSelectSfx();
+        rankingViewMode = "local";
+        renderRanking();
+      });
+      onlineRankTabBtn.addEventListener("click", () => {
+        unlockAudio();
+        playMenuSelectSfx();
+        rankingViewMode = "online";
+        renderRanking();
+      });
+      syncRankBtn.addEventListener("click", () => {
+        unlockAudio();
+        playMenuSelectSfx();
+        void fetchOnlineRanking(true);
       });
       window.addEventListener("resize", handleViewportChange);
       window.addEventListener("keydown", onKeyDown);
@@ -1372,7 +1557,7 @@
       }
 
       function flap() {
-        player.vy = currentSkin.boost;
+        player.vy = currentSkin.boost * currentDifficulty.boostScale;
         playJumpSfx();
       }
 
@@ -1384,6 +1569,7 @@
         playerNameInput.value = currentName;
         localStorage.setItem(NAME_KEY, currentName);
         localStorage.setItem(SKIN_KEY, currentSkinId);
+        localStorage.setItem(DIFFICULTY_KEY, currentDifficultyId);
 
         state = "countdown";
         syncUiState();
@@ -1410,6 +1596,7 @@
         player.y = HEIGHT * 0.5;
         player.vy = 0;
         player.rotation = 0;
+        tutorialStartFrame = 0;
         shrinkUntilScore = 0;
         invincibleCoreCount = 0;
         invincibleUntilScore = 0;
@@ -1529,10 +1716,15 @@
       }
 
       function spawnObstacle() {
+        const difficulty = currentDifficulty;
         const obstacleType = pickObstacleType();
-        const phaseTighten = Math.min(38, currentPhase * 5);
-        const gapSize = clamp(150 + Math.random() * 95 - phaseTighten, 112, 250);
-        const margin = 64;
+        const phaseTighten = Math.min(16, currentPhase * 2 * difficulty.tightenScale);
+        const gapSize = clamp(
+          220 + Math.random() * 130 + difficulty.gapBonus - phaseTighten,
+          170 + difficulty.dynamicGapBonus,
+          330 + difficulty.dynamicGapBonus
+        );
+        const margin = 72 + difficulty.marginBonus;
         const minCenter = margin + gapSize * 0.5;
         const maxCenter = HEIGHT - margin - gapSize * 0.5;
         const gapCenter = minCenter + Math.random() * (maxCenter - minCenter);
@@ -1543,10 +1735,10 @@
           baseGapCenter: gapCenter,
           baseGapSize: gapSize,
           motionSeed: Math.random() * Math.PI * 2,
-          motionAmp: randomBetween(18, 34) + currentPhase * 2.2,
-          motionFreq: randomBetween(0.011, 0.02) + currentPhase * 0.0009,
-          gateFreq: randomBetween(0.085, 0.13),
-          gateMaxClose: randomBetween(24, 44) + currentPhase * 2,
+          motionAmp: (randomBetween(6, 16) + currentPhase * 0.8) * difficulty.motionScale,
+          motionFreq: (randomBetween(0.006, 0.011) + currentPhase * 0.00035) * difficulty.motionScale,
+          gateFreq: randomBetween(0.045, 0.075) * difficulty.motionScale,
+          gateMaxClose: (randomBetween(9, 18) + currentPhase * 0.65) * difficulty.gateScale,
           passed: false,
           invincibleHit: false,
           pulse: Math.random() * Math.PI * 2
@@ -1588,7 +1780,11 @@
           }
           if (elapsedSec >= COUNTDOWN_SECONDS) {
             state = "running";
+            tutorialStartFrame = frame;
             triggerBanner("GO!", 195, 44);
+            if (getTutorialDurationFrames() > 0) {
+              triggerBanner(`TUTORIAL ${currentDifficulty.tutorialSeconds}s`, 191, 46);
+            }
             playGoSfx();
           }
           return;
@@ -1596,12 +1792,17 @@
         if (state !== "running") return;
 
         frame += 1;
-        speed = Math.min(11.4, 4 + frame / 1700 + currentPhase * 0.28);
+        const speedSeed = 3 + frame / 4200 + currentPhase * 0.13;
+        speed = Math.min(7.8 * currentDifficulty.speedCapScale, speedSeed * currentDifficulty.speedScale);
         if (comboCount > 0 && frame > comboExpireFrame) {
           comboCount = 0;
         }
 
-        if (frame % Math.max(54, Math.floor(95 - speed * 4 - currentPhase * 2)) === 0) {
+        const spawnInterval = Math.max(
+          82,
+          Math.floor((140 - speed * 2.6 - currentPhase * 0.8) * currentDifficulty.spawnScale)
+        );
+        if (!isTutorialActive() && frame % spawnInterval === 0) {
           spawnObstacle();
         }
         if (frame >= nextItemSpawnFrame) {
@@ -1611,17 +1812,17 @@
 
         if (frame % currentSkin.trailEvery === 0) emitTrailParticle();
 
-        player.vy += BASE_GRAVITY * currentSkin.gravityScale;
+        player.vy += BASE_GRAVITY * currentSkin.gravityScale * currentDifficulty.gravityScale;
         player.vy = clamp(player.vy, -15, 13);
         player.y += player.vy;
         player.rotation = clamp(player.vy * 0.07, -0.7, 0.95);
 
         const radius = getCurrentCollisionRadius();
         if (player.y - radius < 0 || player.y + radius > HEIGHT) {
-          if (isInvincibleActive()) {
+          if (isInvincibleActive() || isTutorialActive()) {
             player.y = clamp(player.y, radius, HEIGHT - radius);
             player.vy = Math.min(0, player.vy * -0.15);
-            playInvincibleBounceSfx();
+            if (isInvincibleActive()) playInvincibleBounceSfx();
           } else {
             finishGame();
             return;
@@ -1642,6 +1843,7 @@
           }
 
           if (isColliding(obstacle, radius, obstacleGap)) {
+            if (isTutorialActive()) continue;
             if (isInvincibleActive()) {
               if (!obstacle.invincibleHit) {
                 obstacle.invincibleHit = true;
@@ -1655,6 +1857,7 @@
           }
 
           if (isMineColliding(obstacle, obstacleGap, radius)) {
+            if (isTutorialActive()) continue;
             if (isInvincibleActive()) {
               if (!obstacle.invincibleHit) {
                 obstacle.invincibleHit = true;
@@ -1723,24 +1926,67 @@
       function pickObstacleType() {
         const phase = currentPhase;
         const roll = Math.random();
+        const difficultyId = currentDifficulty.id;
+
+        if (difficultyId === "easy") {
+          if (phase <= 0) {
+            return roll < 0.94 ? OBSTACLE_TYPES[0] : OBSTACLE_TYPES[1];
+          }
+          if (phase === 1) {
+            if (roll < 0.72) return OBSTACLE_TYPES[0];
+            if (roll < 0.97) return OBSTACLE_TYPES[1];
+            return OBSTACLE_TYPES[2];
+          }
+          if (phase === 2) {
+            if (roll < 0.58) return OBSTACLE_TYPES[0];
+            if (roll < 0.86) return OBSTACLE_TYPES[1];
+            if (roll < 0.99) return OBSTACLE_TYPES[2];
+            return OBSTACLE_TYPES[3];
+          }
+          if (roll < 0.46) return OBSTACLE_TYPES[0];
+          if (roll < 0.75) return OBSTACLE_TYPES[1];
+          if (roll < 0.95) return OBSTACLE_TYPES[2];
+          return OBSTACLE_TYPES[3];
+        }
+
+        if (difficultyId === "hard") {
+          if (phase <= 0) {
+            return roll < 0.78 ? OBSTACLE_TYPES[0] : OBSTACLE_TYPES[1];
+          }
+          if (phase === 1) {
+            if (roll < 0.45) return OBSTACLE_TYPES[0];
+            if (roll < 0.75) return OBSTACLE_TYPES[1];
+            return OBSTACLE_TYPES[2];
+          }
+          if (phase === 2) {
+            if (roll < 0.28) return OBSTACLE_TYPES[0];
+            if (roll < 0.55) return OBSTACLE_TYPES[1];
+            if (roll < 0.82) return OBSTACLE_TYPES[2];
+            return OBSTACLE_TYPES[3];
+          }
+          if (roll < 0.18) return OBSTACLE_TYPES[0];
+          if (roll < 0.4) return OBSTACLE_TYPES[1];
+          if (roll < 0.68) return OBSTACLE_TYPES[2];
+          return OBSTACLE_TYPES[3];
+        }
 
         if (phase <= 0) {
-          return roll < 0.82 ? OBSTACLE_TYPES[0] : OBSTACLE_TYPES[1];
+          return roll < 0.9 ? OBSTACLE_TYPES[0] : OBSTACLE_TYPES[1];
         }
         if (phase === 1) {
-          if (roll < 0.48) return OBSTACLE_TYPES[0];
-          if (roll < 0.82) return OBSTACLE_TYPES[1];
+          if (roll < 0.64) return OBSTACLE_TYPES[0];
+          if (roll < 0.95) return OBSTACLE_TYPES[1];
           return OBSTACLE_TYPES[2];
         }
         if (phase === 2) {
-          if (roll < 0.34) return OBSTACLE_TYPES[0];
-          if (roll < 0.62) return OBSTACLE_TYPES[1];
-          if (roll < 0.88) return OBSTACLE_TYPES[2];
+          if (roll < 0.52) return OBSTACLE_TYPES[0];
+          if (roll < 0.81) return OBSTACLE_TYPES[1];
+          if (roll < 0.97) return OBSTACLE_TYPES[2];
           return OBSTACLE_TYPES[3];
         }
-        if (roll < 0.22) return OBSTACLE_TYPES[0];
-        if (roll < 0.44) return OBSTACLE_TYPES[1];
-        if (roll < 0.7) return OBSTACLE_TYPES[2];
+        if (roll < 0.42) return OBSTACLE_TYPES[0];
+        if (roll < 0.7) return OBSTACLE_TYPES[1];
+        if (roll < 0.91) return OBSTACLE_TYPES[2];
         return OBSTACLE_TYPES[3];
       }
 
@@ -1751,16 +1997,18 @@
         if (obstacle.type === "wave") {
           center += Math.sin(frame * obstacle.motionFreq + obstacle.motionSeed) * obstacle.motionAmp;
         } else if (obstacle.type === "rotor") {
-          center += Math.sin(frame * obstacle.motionFreq * 1.65 + obstacle.motionSeed) * obstacle.motionAmp * 1.36;
-          gapSize += Math.sin(frame * obstacle.motionFreq * 2.3 + obstacle.motionSeed * 0.7) * 18;
+          center += Math.sin(frame * obstacle.motionFreq * 1.65 + obstacle.motionSeed) * obstacle.motionAmp * 1.12;
+          gapSize += Math.sin(frame * obstacle.motionFreq * 2.3 + obstacle.motionSeed * 0.7) * 10;
         } else if (obstacle.type === "gate") {
           const cycle = (Math.sin(frame * obstacle.gateFreq + obstacle.motionSeed) + 1) * 0.5;
           gapSize -= cycle * obstacle.gateMaxClose;
-          center += Math.sin(frame * obstacle.motionFreq * 1.24 + obstacle.motionSeed * 0.6) * obstacle.motionAmp * 0.45;
+          center += Math.sin(frame * obstacle.motionFreq * 1.24 + obstacle.motionSeed * 0.6) * obstacle.motionAmp * 0.3;
         }
 
-        gapSize = clamp(gapSize, 96, 280);
-        const margin = 58;
+        const dynamicGapMin = Math.max(102, 122 + currentDifficulty.dynamicGapBonus);
+        const dynamicGapMax = Math.max(dynamicGapMin + 36, 320 + currentDifficulty.dynamicGapBonus);
+        gapSize = clamp(gapSize, dynamicGapMin, dynamicGapMax);
+        const margin = 64 + currentDifficulty.marginBonus;
         const minCenter = margin + gapSize * 0.5;
         const maxCenter = HEIGHT - margin - gapSize * 0.5;
         center = clamp(center, minCenter, maxCenter);
@@ -1851,7 +2099,8 @@
       }
 
       function getPhaseForScore(scoreValue) {
-        return Math.floor(Math.max(0, scoreValue) / PHASE_INTERVAL);
+        const interval = Math.max(20, Math.round(PHASE_INTERVAL * currentDifficulty.phaseScale));
+        return Math.floor(Math.max(0, scoreValue) / interval);
       }
 
       function triggerPhaseShift(phaseIndex) {
@@ -1915,7 +2164,7 @@
 
       function isMineColliding(obstacle, obstacleGap, radius) {
         const mineX = obstacle.x + OBSTACLE_WIDTH * 0.5;
-        const mineR = Math.max(6, getMineRadius(obstacle.pulse, obstacle.type) - 1.3);
+        const mineR = Math.max(4.4, (getMineRadius(obstacle.pulse, obstacle.type) - 2.6) * currentDifficulty.mineScale);
         return (
           isCircleHit(player.x, player.y, radius, mineX, obstacleGap.gapTop + 25, mineR) ||
           isCircleHit(player.x, player.y, radius, mineX, obstacleGap.gapBottom - 25, mineR)
@@ -1945,7 +2194,8 @@
           localStorage.setItem(SCORE_KEY, String(highScore));
           highScoreEl.textContent = String(highScore);
         }
-        registerRanking();
+        const latestEntry = registerRanking();
+        void syncOnlineRankingWithEntry(latestEntry);
         renderRanking();
         const message = reason === "スコア"
           ? `${currentName} のスコア: ${score}`
@@ -1958,62 +2208,150 @@
       }
 
       function registerRanking() {
-        ranking.push({
+        const entry = {
           name: currentName,
           score,
           skinId: currentSkinId,
+          difficultyId: currentDifficultyId,
           at: Date.now()
-        });
-        ranking = ranking
-          .sort((a, b) => b.score - a.score || b.at - a.at)
-          .slice(0, MAX_RANKING);
+        };
+        ranking = sanitizeRankingEntries([...ranking, entry]);
         localStorage.setItem(RANKING_KEY, JSON.stringify(ranking));
+        return entry;
       }
 
       function clearRanking() {
         ranking = [];
+        rankingViewMode = "local";
         localStorage.removeItem(RANKING_KEY);
         highScore = 0;
         highScoreEl.textContent = "0";
         localStorage.setItem(SCORE_KEY, "0");
         renderRanking();
-        showStartScreen("ランキングをリセットしました。");
+        showStartScreen("ローカル記録をリセットしました。");
       }
 
       function loadRanking() {
         try {
           const parsed = JSON.parse(localStorage.getItem(RANKING_KEY) || "[]");
-          if (!Array.isArray(parsed)) return [];
-          const sanitized = parsed
-            .map((item) => ({
-              name: normalizeName(item && item.name),
-              score: Math.max(0, Math.floor(Number(item && item.score))),
-              skinId: isValidSkinId(item && item.skinId) ? item.skinId : SQUID_SKINS[0].id,
-              at: Number.isFinite(Number(item && item.at)) ? Number(item.at) : Date.now()
-            }))
-            .filter((item) => Number.isFinite(item.score));
-
-          return sanitized
-            .sort((a, b) => b.score - a.score || b.at - a.at)
-            .slice(0, MAX_RANKING);
+          return sanitizeRankingEntries(parsed);
         } catch {
           return [];
         }
       }
 
+      function sanitizeRankingEntries(rawEntries) {
+        if (!Array.isArray(rawEntries)) return [];
+        return rawEntries
+          .map((item) => ({
+            name: normalizeName(item && item.name),
+            score: Math.max(0, Math.floor(Number(item && item.score))),
+            skinId: isValidSkinId(item && item.skinId) ? item.skinId : SQUID_SKINS[0].id,
+            difficultyId: isValidDifficultyId(item && item.difficultyId) ? item.difficultyId : "normal",
+            at: Number.isFinite(Number(item && item.at)) ? Number(item.at) : Date.now()
+          }))
+          .filter((item) => Number.isFinite(item.score))
+          .sort((a, b) => b.score - a.score || b.at - a.at)
+          .slice(0, MAX_RANKING);
+      }
+
+      function getRankingStatusLabel() {
+        if (rankingViewMode === "local") {
+          return `LOCAL ${ranking.length}件`;
+        }
+        if (onlineStatus === "loading") return "ONLINE 読み込み中...";
+        if (onlineStatus === "saving") return "ONLINE 同期中...";
+        if (onlineStatus === "error") return onlineStatusMessage || "ONLINE 接続エラー";
+        return onlineStatusMessage || `ONLINE ${onlineRanking.length}件`;
+      }
+
+      async function requestOnlineRankingEntries() {
+        const response = await fetch(ONLINE_RANKING_URL, {
+          method: "GET",
+          cache: "no-store"
+        });
+        if (!response.ok) throw new Error(`online fetch failed: ${response.status}`);
+        const payload = await response.json();
+        const entries = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload && payload.entries)
+            ? payload.entries
+            : [];
+        return sanitizeRankingEntries(entries);
+      }
+
+      async function fetchOnlineRanking(isManual = false) {
+        onlineStatus = "loading";
+        onlineStatusMessage = isManual ? "ONLINE 手動更新中..." : "ONLINE 接続中...";
+        renderRanking();
+        try {
+          onlineRanking = await requestOnlineRankingEntries();
+          onlineStatus = "ready";
+          onlineStatusMessage = `ONLINE ${onlineRanking.length}件`;
+        } catch {
+          onlineStatus = "error";
+          onlineStatusMessage = "ONLINE 取得失敗";
+          if (rankingViewMode === "online" && onlineRanking.length === 0) {
+            rankingViewMode = "local";
+          }
+        }
+        renderRanking();
+      }
+
+      async function syncOnlineRankingWithEntry(entry) {
+        if (!entry || onlineSyncInFlight) return;
+        onlineSyncInFlight = true;
+        onlineStatus = "saving";
+        onlineStatusMessage = "ONLINE 同期中...";
+        renderRanking();
+        try {
+          const remoteEntries = await requestOnlineRankingEntries();
+          const merged = sanitizeRankingEntries([...remoteEntries, entry]);
+          const response = await fetch(ONLINE_RANKING_URL, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ entries: merged })
+          });
+          if (!response.ok) throw new Error(`online put failed: ${response.status}`);
+          onlineRanking = merged;
+          onlineStatus = "ready";
+          onlineStatusMessage = `ONLINE 同期済み ${onlineRanking.length}件`;
+        } catch {
+          onlineStatus = "error";
+          onlineStatusMessage = "ONLINE 同期失敗";
+        } finally {
+          onlineSyncInFlight = false;
+          renderRanking();
+        }
+      }
+
       function renderRanking() {
+        localRankTabBtn.classList.toggle("active", rankingViewMode === "local");
+        onlineRankTabBtn.classList.toggle("active", rankingViewMode === "online");
+        rankingStatusEl.textContent = getRankingStatusLabel();
+
+        const source = rankingViewMode === "online" ? onlineRanking : ranking;
         rankingListEl.innerHTML = "";
-        if (ranking.length === 0) {
+        if (source.length === 0) {
           const empty = document.createElement("li");
           empty.className = "ranking-empty";
-          empty.textContent = "まだ記録がありません。";
+          if (rankingViewMode === "online") {
+            empty.textContent = onlineStatus === "loading"
+              ? "オンラインランキングを読み込み中..."
+              : "オンライン記録がまだありません。";
+          } else {
+            empty.textContent = "ローカル記録がまだありません。";
+          }
           rankingListEl.appendChild(empty);
           return;
         }
 
-        for (let i = 0; i < ranking.length; i += 1) {
-          const entry = ranking[i];
+        for (let i = 0; i < source.length; i += 1) {
+          const entry = source[i];
           const skin = getSkin(entry.skinId);
+          const difficulty = getDifficulty(entry.difficultyId);
 
           const row = document.createElement("li");
           row.className = "ranking-row";
@@ -2031,7 +2369,7 @@
 
           const meta = document.createElement("div");
           meta.className = "ranking-meta";
-          meta.textContent = `${skin.name} / ${formatDate(entry.at)}`;
+          meta.textContent = `${skin.name} / ${difficulty.name} / ${formatDate(entry.at)}`;
 
           const scoreText = document.createElement("span");
           scoreText.className = "ranking-score";
@@ -2043,6 +2381,36 @@
           row.appendChild(nameWrap);
           row.appendChild(scoreText);
           rankingListEl.appendChild(row);
+        }
+      }
+
+      function renderDifficultyOptions() {
+        difficultyOptionsEl.innerHTML = "";
+        for (const difficulty of DIFFICULTIES) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `difficulty-btn${difficulty.id === currentDifficultyId ? " active" : ""}`;
+
+          const title = document.createElement("span");
+          title.className = "difficulty-name";
+          title.textContent = difficulty.name;
+
+          const desc = document.createElement("span");
+          desc.className = "difficulty-desc";
+          desc.textContent = difficulty.desc;
+
+          button.appendChild(title);
+          button.appendChild(desc);
+          button.addEventListener("click", () => {
+            unlockAudio();
+            playMenuSelectSfx();
+            currentDifficultyId = difficulty.id;
+            currentDifficulty = difficulty;
+            localStorage.setItem(DIFFICULTY_KEY, currentDifficultyId);
+            renderDifficultyOptions();
+            renderRanking();
+          });
+          difficultyOptionsEl.appendChild(button);
         }
       }
 
@@ -2106,6 +2474,7 @@
         drawTrail();
         drawPlayer();
         drawCelebration();
+        drawTutorialHint();
         drawCountdown();
       }
 
@@ -2247,7 +2616,7 @@
       }
 
       function getMineRadius(pulse, obstacleType = "static") {
-        return 11 + Math.sin(pulse) * 2 + (obstacleType === "rotor" ? 2.4 : 0);
+        return 9.5 + Math.sin(pulse) * 1.6 + (obstacleType === "rotor" ? 1.4 : 0);
       }
 
       function drawPipe(x, y, width, height, top, pulse, obstacleType = "static") {
@@ -2326,6 +2695,39 @@
           ctx.fillStyle = "rgba(251, 191, 36, 0.95)";
           ctx.fillText(`COMBO x${comboCount}`, 16, 38);
         }
+        ctx.textAlign = "right";
+        ctx.fillStyle = "rgba(103, 232, 249, 0.92)";
+        ctx.fillText(currentDifficulty.name, WIDTH - 16, 14);
+        ctx.restore();
+      }
+
+      function drawTutorialHint() {
+        if (!isTutorialActive()) return;
+
+        const remainSec = Math.ceil(getTutorialRemainingFrames() / 60);
+        const boxW = Math.min(430, WIDTH - 26);
+        const boxH = 74;
+        const x = WIDTH - boxW - 13;
+        const y = 48;
+
+        ctx.save();
+        ctx.fillStyle = "rgba(2, 6, 23, 0.7)";
+        ctx.fillRect(x, y, boxW, boxH);
+        ctx.strokeStyle = "rgba(34, 211, 238, 0.58)";
+        ctx.lineWidth = 1.8;
+        ctx.strokeRect(x, y, boxW, boxH);
+
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = "rgba(103, 232, 249, 0.96)";
+        ctx.font = '700 18px "Avenir Next", "Hiragino Sans", sans-serif';
+        ctx.fillText(`TUTORIAL ${remainSec}s`, x + 12, y + 10);
+
+        ctx.fillStyle = "rgba(226, 232, 240, 0.92)";
+        ctx.font = '600 14px "Avenir Next", "Hiragino Sans", sans-serif';
+        ctx.fillText("Space / ↑ / W / TAP で上昇", x + 12, y + 34);
+        ctx.fillStyle = "rgba(148, 163, 184, 0.96)";
+        ctx.fillText("この間は障害物なしの練習時間", x + 12, y + 53);
         ctx.restore();
       }
 
@@ -2656,6 +3058,14 @@
         return SQUID_SKINS.find((skin) => skin.id === skinId) || SQUID_SKINS[0];
       }
 
+      function isValidDifficultyId(difficultyId) {
+        return DIFFICULTIES.some((difficulty) => difficulty.id === difficultyId);
+      }
+
+      function getDifficulty(difficultyId) {
+        return DIFFICULTIES.find((difficulty) => difficulty.id === difficultyId) || DIFFICULTIES[1];
+      }
+
       function randomBetween(min, max) {
         return min + Math.random() * (max - min);
       }
@@ -2664,9 +3074,22 @@
         return Math.floor(randomBetween(ITEM_SPAWN_MIN_FRAMES, ITEM_SPAWN_MAX_FRAMES));
       }
 
+      function getTutorialDurationFrames() {
+        return Math.max(0, Math.round(currentDifficulty.tutorialSeconds * 60));
+      }
+
+      function getTutorialRemainingFrames() {
+        if (state !== "running") return 0;
+        return Math.max(0, getTutorialDurationFrames() - (frame - tutorialStartFrame));
+      }
+
+      function isTutorialActive() {
+        return getTutorialRemainingFrames() > 0;
+      }
+
       function getCurrentCollisionRadius() {
-        const mobileScale = isMobileViewport ? MOBILE_RADIUS_SCALE : 1;
-        const base = PLAYER_SIZE * currentSkin.radiusScale * mobileScale;
+        const viewportScale = isMobileViewport ? MOBILE_RADIUS_SCALE : 0.9;
+        const base = PLAYER_SIZE * currentSkin.radiusScale * viewportScale * currentDifficulty.hitboxScale;
         return isShrinkActive() ? base * SHRINK_RADIUS_SCALE : base;
       }
 
