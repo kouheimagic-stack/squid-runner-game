@@ -1148,9 +1148,11 @@
       const SKIN_KEY = "squid_drift_skin_v1";
       const DIFFICULTY_KEY = "squid_drift_difficulty_v1";
       const MAX_RANKING = 10;
-      // jsonblob.com is often blocked by browser CORS; go through a CORS proxy.
-      const ONLINE_RANKING_SOURCE_URL = "https://jsonblob.com/api/jsonBlob/019c3cc3-8ea1-7fcc-812f-d4b703d31169";
-      const ONLINE_RANKING_URL = `https://cors.isomorphic-git.org/${ONLINE_RANKING_SOURCE_URL}`;
+      // Online ranking backend (KVdb).
+      // Note: KVdb requires the bucket owner's email verification before writes work.
+      const KVDB_BUCKET_ID = "Ete9hrStLt7UNrLH68Td3V";
+      const KVDB_RANKING_KEY = "squid-drift-ranking-v1";
+      const ONLINE_RANKING_URL = `https://kvdb.io/${KVDB_BUCKET_ID}/${KVDB_RANKING_KEY}`;
 
       const DIFFICULTIES = [
         {
@@ -2422,8 +2424,15 @@
           method: "GET",
           cache: "no-store"
         });
+        if (response.status === 404) return [];
         if (!response.ok) throw new Error(`online fetch failed: ${response.status}`);
-        const payload = await response.json();
+        const rawText = await response.text();
+        let payload = null;
+        try {
+          payload = JSON.parse(rawText);
+        } catch {
+          payload = null;
+        }
         const entries = Array.isArray(payload)
           ? payload
           : Array.isArray(payload && payload.entries)
@@ -2458,19 +2467,26 @@
           const remoteEntries = await requestOnlineRankingEntries();
           const merged = sanitizeRankingEntries([...remoteEntries, entry]);
           const response = await fetch(ONLINE_RANKING_URL, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json"
-            },
+            method: "POST",
+            // No JSON headers: keep it "simple" to avoid CORS preflight where possible.
             body: JSON.stringify({ entries: merged })
           });
-          if (!response.ok) throw new Error(`online put failed: ${response.status}`);
+          if (!response.ok) {
+            const detail = await response.text().catch(() => "");
+            const err = new Error(`online post failed: ${response.status} ${detail}`.trim());
+            err.status = response.status;
+            err.detail = detail;
+            throw err;
+          }
           onlineRanking = merged;
           onlineStatus = "ready";
           onlineStatusMessage = `ONLINE 同期済み ${onlineRanking.length}件`;
-        } catch {
+        } catch (err) {
           onlineStatus = "error";
-          onlineStatusMessage = "ONLINE 同期失敗";
+          const detail = (err && err.detail ? String(err.detail) : "").toLowerCase();
+          onlineStatusMessage = detail.includes("email address not verified")
+            ? "ONLINE 同期失敗: KVdbのメール認証が必要です"
+            : "ONLINE 同期失敗";
         } finally {
           onlineSyncInFlight = false;
           renderRanking();
@@ -2491,7 +2507,9 @@
             if (onlineStatus === "loading") {
               empty.textContent = "オンラインランキングを読み込み中...";
             } else if (onlineStatus === "error") {
-              empty.textContent = "オンラインランキングに接続できませんでした。右上の「同期」で再試行できます。";
+              empty.textContent = (onlineStatusMessage || "").includes("メール認証")
+                ? "オンラインランキング保存にはKVdbのメール認証が必要です（受信箱のKVdbメールを確認）。"
+                : "オンラインランキングに接続できませんでした。右上の「同期」で再試行できます。";
             } else {
               empty.textContent = "オンライン記録がまだありません。";
             }
