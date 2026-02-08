@@ -140,7 +140,7 @@
       position: absolute;
       inset: 0;
       display: grid;
-      place-items: center;
+      place-items: start center;
       padding: 18px;
       border-radius: 14px;
       background:
@@ -156,7 +156,7 @@
       position: absolute;
       inset: 0;
       display: grid;
-      place-items: center;
+      place-items: start center;
       padding: 18px;
       border-radius: 14px;
       background:
@@ -187,7 +187,7 @@
       background: rgba(2, 6, 23, 0.82);
       padding: 14px;
       box-shadow: 0 20px 40px rgba(2, 6, 23, 0.62);
-      max-height: min(86vh, 760px);
+      max-height: min(86vh, 760px, calc(100% - 24px));
       overflow: auto;
       overscroll-behavior: contain;
     }
@@ -200,6 +200,9 @@
       background: rgba(2, 6, 23, 0.84);
       padding: 14px;
       box-shadow: 0 20px 40px rgba(2, 6, 23, 0.62);
+      max-height: min(86vh, 760px, calc(100% - 24px));
+      overflow: auto;
+      overscroll-behavior: contain;
     }
 
     .title-panel {
@@ -208,8 +211,6 @@
         radial-gradient(circle at 12% 10%, rgba(14, 165, 233, 0.2), transparent 45%),
         radial-gradient(circle at 84% 12%, rgba(56, 189, 248, 0.18), transparent 44%),
         linear-gradient(160deg, rgba(2, 6, 23, 0.95), rgba(5, 27, 54, 0.92));
-      max-height: min(86vh, 760px);
-      overflow: auto;
     }
 
     .title-hero {
@@ -1147,7 +1148,9 @@
       const SKIN_KEY = "squid_drift_skin_v1";
       const DIFFICULTY_KEY = "squid_drift_difficulty_v1";
       const MAX_RANKING = 10;
-      const ONLINE_RANKING_URL = "https://jsonblob.com/api/jsonBlob/019c3cc3-8ea1-7fcc-812f-d4b703d31169";
+      // jsonblob.com is often blocked by browser CORS; go through a CORS proxy.
+      const ONLINE_RANKING_SOURCE_URL = "https://jsonblob.com/api/jsonBlob/019c3cc3-8ea1-7fcc-812f-d4b703d31169";
+      const ONLINE_RANKING_URL = `https://cors.isomorphic-git.org/${ONLINE_RANKING_SOURCE_URL}`;
 
       const DIFFICULTIES = [
         {
@@ -1459,6 +1462,9 @@
         playMenuSelectSfx();
         rankingViewMode = "online";
         renderRanking();
+        if (onlineStatus === "idle" || onlineStatus === "error" || onlineRanking.length === 0) {
+          void fetchOnlineRanking(true);
+        }
       });
       syncRankBtn.addEventListener("click", () => {
         unlockAudio();
@@ -1667,6 +1673,10 @@
 
       function showTitleScreen(message) {
         titleMessageEl.textContent = message;
+        // Reset scroll so the header is never clipped after a previous scroll.
+        titleScreenEl.scrollTop = 0;
+        const titlePanel = titleScreenEl.querySelector(".title-panel");
+        if (titlePanel) titlePanel.scrollTop = 0;
         titleScreenEl.classList.remove("hidden");
       }
 
@@ -1688,6 +1698,10 @@
           newRecordNoteEl.textContent = "NEW RECORD ACHIEVED";
         }
         startMessageEl.textContent = message;
+        // Reset scroll so the header is never clipped after a previous scroll.
+        startScreenEl.scrollTop = 0;
+        const startPanel = startScreenEl.querySelector(".start-panel");
+        if (startPanel) startPanel.scrollTop = 0;
         hideTitleScreen();
         hideGameOverScreen();
         startScreenEl.classList.remove("hidden");
@@ -1710,6 +1724,10 @@
           : (resultIsNewRecord ? "NEW RECORD!" : "GAME OVER");
         gameOverTitleEl.classList.toggle("new-record", resultIsNewRecord);
         gameOverMessageEl.textContent = message;
+        // Reset scroll so the top of the panel is always visible.
+        gameOverScreenEl.scrollTop = 0;
+        const gameOverPanel = gameOverScreenEl.querySelector(".gameover-panel");
+        if (gameOverPanel) gameOverPanel.scrollTop = 0;
         hideStartScreen();
         hideTitleScreen();
         gameOverScreenEl.classList.remove("hidden");
@@ -2422,12 +2440,10 @@
           onlineRanking = await requestOnlineRankingEntries();
           onlineStatus = "ready";
           onlineStatusMessage = `ONLINE ${onlineRanking.length}件`;
-        } catch {
+        } catch (err) {
           onlineStatus = "error";
           onlineStatusMessage = "ONLINE 取得失敗";
-          if (rankingViewMode === "online" && onlineRanking.length === 0) {
-            rankingViewMode = "local";
-          }
+          console.warn(err);
         }
         renderRanking();
       }
@@ -2472,9 +2488,13 @@
           const empty = document.createElement("li");
           empty.className = "ranking-empty";
           if (rankingViewMode === "online") {
-            empty.textContent = onlineStatus === "loading"
-              ? "オンラインランキングを読み込み中..."
-              : "オンライン記録がまだありません。";
+            if (onlineStatus === "loading") {
+              empty.textContent = "オンラインランキングを読み込み中...";
+            } else if (onlineStatus === "error") {
+              empty.textContent = "オンラインランキングに接続できませんでした。右上の「同期」で再試行できます。";
+            } else {
+              empty.textContent = "オンライン記録がまだありません。";
+            }
           } else {
             empty.textContent = "ローカル記録がまだありません。";
           }
