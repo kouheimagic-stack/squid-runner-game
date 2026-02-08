@@ -40,7 +40,8 @@
     }
 
     body.ui-title,
-    body.ui-gameover {
+    body.ui-gameover,
+    body.ui-ending {
       overflow: hidden;
     }
 
@@ -108,6 +109,12 @@
       letter-spacing: 0.04em;
       text-transform: uppercase;
       min-height: 1em;
+    }
+
+    .score-delta {
+      color: rgba(52, 211, 153, 0.95);
+      letter-spacing: 0.12em;
+      font-weight: 800;
     }
 
     .arena {
@@ -964,6 +971,7 @@
       <div class="card">
         <div class="label">Score</div>
         <div class="value" id="score">0</div>
+        <div class="mini-status score-delta" id="scoreDelta"></div>
       </div>
       <div class="card">
         <div class="label">Best</div>
@@ -1021,7 +1029,7 @@
 
               <button class="start-btn" id="startBtn" type="button">ゲーム開始</button>
               <button id="titleBtn" class="inline-btn" type="button">タイトルへ戻る</button>
-              <p class="hint">操作: Space / ↑ / W / 画面タップ / JUMP。開幕チュートリアル中は安全地帯。Sでミニ化、+で加点、Iを3つ集めると10pt無敵。</p>
+              <p class="hint">操作: Space / ↑ / W / 画面タップ / JUMP。開幕チュートリアル中は安全地帯。Sでミニ化、+で+5点、Iを3つ集めると10pt無敵。</p>
             </section>
 
             <section class="ranking-panel">
@@ -1043,7 +1051,7 @@
 
       <div class="gameover-overlay hidden" id="gameOverScreen">
         <div class="gameover-panel">
-          <p class="badge">MISSION RESULT</p>
+          <p class="badge" id="resultBadge">MISSION RESULT</p>
           <h2 class="gameover-title" id="gameOverTitle">GAME OVER</h2>
           <p class="gameover-message" id="gameOverMessage"></p>
           <div class="gameover-actions">
@@ -1070,6 +1078,7 @@
       const canvas = document.getElementById("game");
       const ctx = canvas.getContext("2d");
       const scoreEl = document.getElementById("score");
+      const scoreDeltaEl = document.getElementById("scoreDelta");
       const highScoreEl = document.getElementById("highScore");
       const pilotEl = document.getElementById("pilotText");
       const shieldCountEl = document.getElementById("shieldCount");
@@ -1084,6 +1093,7 @@
       const startScreenEl = document.getElementById("startScreen");
       const startMessageEl = document.getElementById("startMessage");
       const gameOverScreenEl = document.getElementById("gameOverScreen");
+      const resultBadgeEl = document.getElementById("resultBadge");
       const gameOverTitleEl = document.getElementById("gameOverTitle");
       const gameOverMessageEl = document.getElementById("gameOverMessage");
       const retryBtn = document.getElementById("retryBtn");
@@ -1118,12 +1128,13 @@
       const ITEM_SPAWN_MIN_FRAMES = 220;
       const ITEM_SPAWN_MAX_FRAMES = 370;
       const SHRINK_POINTS = 5;
-      const BONUS_SCORE = 2;
+      const BONUS_SCORE = 5;
       const INVINCIBLE_CORE_REQUIRED = 3;
       const INVINCIBLE_POINTS = 10;
       const MOBILE_RADIUS_SCALE = 0.65;
       const MOBILE_RENDER_SCALE = 0.7;
-      const PHASE_INTERVAL = 70;
+      const PHASE_INTERVAL = 30;
+      const FINAL_SCORE = 300;
       const NEAR_MISS_THRESHOLD = 18;
       const COMBO_TIMEOUT_FRAMES = 172;
       const BGM_BPM = 132;
@@ -1320,10 +1331,13 @@
       let celebrationFrames = 0;
       let celebrationText = "";
       let celebrationHue = 0;
+      let phaseShiftFrames = 0;
+      let phaseShiftHue = 0;
       let menuInputLockUntil = 0;
       let countdownStartedAt = 0;
       let countdownValue = COUNTDOWN_SECONDS;
       let lastCountdownTickValue = COUNTDOWN_SECONDS + 1;
+      let scoreDeltaFrames = 0;
       let tutorialStartFrame = 0;
       let shrinkUntilScore = 0;
       let invincibleCoreCount = 0;
@@ -1337,6 +1351,8 @@
       let onlineStatus = "idle";
       let onlineStatusMessage = "ONLINE 接続待機";
       let onlineSyncInFlight = false;
+      let endingFrames = 0;
+      let endingCatchPlayed = false;
       let audioCtx = null;
       let sfxGainNode = null;
       let bgmGainNode = null;
@@ -1402,7 +1418,7 @@
       menuBtn.addEventListener("click", () => {
         unlockAudio();
         playMenuSelectSfx();
-        if (state === "running" || state === "countdown") {
+        if (state === "running" || state === "countdown" || state === "ending") {
           returnToMenu("スタート画面に戻りました。");
         } else if (state === "title") {
           showTitleScreen("4タイプのイカで深海を駆け抜けろ。スマホは横画面プレイ推奨。");
@@ -1589,10 +1605,17 @@
         frame = 0;
         score = 0;
         speed = 4;
+        endingFrames = 0;
+        endingCatchPlayed = false;
         currentPhase = 0;
         comboCount = 0;
         comboExpireFrame = 0;
         scoreEl.textContent = "0";
+        scoreDeltaFrames = 0;
+        if (scoreDeltaEl) {
+          scoreDeltaEl.textContent = "";
+          scoreDeltaEl.style.color = "";
+        }
         player.y = HEIGHT * 0.5;
         player.vy = 0;
         player.rotation = 0;
@@ -1607,6 +1630,8 @@
         particles = [];
         celebrationFrames = 0;
         celebrationText = "";
+        phaseShiftFrames = 0;
+        phaseShiftHue = 0;
         if (resetObstacles) obstacles = [];
       }
 
@@ -1672,11 +1697,17 @@
         startScreenEl.classList.add("hidden");
       }
 
-      function showGameOverScreen(message, isNewRecord, scoreValue) {
+      function showGameOverScreen(message, isNewRecord, scoreValue, mode = "gameover") {
         resultMessage = message;
         resultIsNewRecord = Boolean(isNewRecord);
         resultScore = scoreValue;
-        gameOverTitleEl.textContent = resultIsNewRecord ? "NEW RECORD!" : "GAME OVER";
+        const isClear = mode === "clear";
+        if (resultBadgeEl) {
+          resultBadgeEl.textContent = isClear ? "MISSION COMPLETE" : "MISSION RESULT";
+        }
+        gameOverTitleEl.textContent = isClear
+          ? "HAPPY END!"
+          : (resultIsNewRecord ? "NEW RECORD!" : "GAME OVER");
         gameOverTitleEl.classList.toggle("new-record", resultIsNewRecord);
         gameOverMessageEl.textContent = message;
         hideStartScreen();
@@ -1709,10 +1740,12 @@
         const menu = state === "menu";
         const title = state === "title";
         const gameover = state === "gameover";
+        const ending = state === "ending";
         document.body.classList.toggle("ui-playing", playing);
         document.body.classList.toggle("ui-menu", menu);
         document.body.classList.toggle("ui-title", title);
         document.body.classList.toggle("ui-gameover", gameover);
+        document.body.classList.toggle("ui-ending", ending);
       }
 
       function spawnObstacle() {
@@ -1770,7 +1803,9 @@
         }
 
         updateParticles();
+        updateScoreDelta();
         if (celebrationFrames > 0) celebrationFrames -= 1;
+        if (phaseShiftFrames > 0) phaseShiftFrames -= 1;
         if (state === "countdown") {
           const elapsedSec = (performance.now() - countdownStartedAt) / 1000;
           countdownValue = Math.max(1, Math.ceil(COUNTDOWN_SECONDS - elapsedSec));
@@ -1787,6 +1822,10 @@
             }
             playGoSfx();
           }
+          return;
+        }
+        if (state === "ending") {
+          updateEnding();
           return;
         }
         if (state !== "running") return;
@@ -1837,8 +1876,10 @@
           if (!obstacle.passed && obstacle.x + OBSTACLE_WIDTH < player.x - radius) {
             obstacle.passed = true;
             addScore(1);
+            if (state !== "running") return;
             if (isNearMiss(obstacleGap, radius)) {
               registerNearMiss();
+              if (state !== "running") return;
             }
           }
 
@@ -1879,6 +1920,7 @@
 
           item.collected = true;
           handleItemCollect(item);
+          if (state !== "running") return;
         }
 
         obstacles = obstacles.filter((obstacle) => obstacle.x + OBSTACLE_WIDTH > -80);
@@ -1907,6 +1949,27 @@
           particle.r *= 0.985;
           return particle.life > 0.03;
         });
+      }
+
+      function showScoreDelta(text, hue = null) {
+        if (!scoreDeltaEl) return;
+        scoreDeltaFrames = 42;
+        scoreDeltaEl.textContent = String(text || "");
+        if (Number.isFinite(hue)) {
+          scoreDeltaEl.style.color = `hsla(${hue}, 92%, 64%, 0.98)`;
+        } else {
+          scoreDeltaEl.style.color = "";
+        }
+      }
+
+      function updateScoreDelta() {
+        if (!scoreDeltaEl) return;
+        if (scoreDeltaFrames <= 0) return;
+        scoreDeltaFrames -= 1;
+        if (scoreDeltaFrames <= 0) {
+          scoreDeltaEl.textContent = "";
+          scoreDeltaEl.style.color = "";
+        }
       }
 
       function pickItemType() {
@@ -2036,6 +2099,7 @@
         comboExpireFrame = frame + COMBO_TIMEOUT_FRAMES;
         const bonus = getNearMissBonus();
         addScore(bonus);
+        if (state !== "running") return;
         triggerBanner(`NEAR MISS x${comboCount} +${bonus}`, 36 + Math.min(110, comboCount * 9), 44);
         emitItemBurst(player.x + 8, player.y, "hsla(39, 95%, 62%, 1)", 22);
         playNearMissSfx(comboCount);
@@ -2054,6 +2118,7 @@
 
         if (item.type === "bonus") {
           addScore(BONUS_SCORE);
+          showScoreDelta(`+${BONUS_SCORE}`, itemType.hue);
           triggerBanner(`BONUS +${BONUS_SCORE}`, itemType.hue, 50);
           playItemSfx(item.type);
           return;
@@ -2078,7 +2143,7 @@
         const safePoints = Math.max(0, Math.floor(points));
         if (safePoints <= 0) return;
         const prevScore = score;
-        score += safePoints;
+        score = Math.min(FINAL_SCORE, score + safePoints);
         scoreEl.textContent = String(score);
         updateShieldHud();
 
@@ -2096,16 +2161,22 @@
           }
           currentPhase = nextPhase;
         }
+
+        if (prevScore < FINAL_SCORE && score >= FINAL_SCORE) {
+          startEnding();
+        }
       }
 
       function getPhaseForScore(scoreValue) {
-        const interval = Math.max(20, Math.round(PHASE_INTERVAL * currentDifficulty.phaseScale));
-        return Math.floor(Math.max(0, scoreValue) / interval);
+        return Math.floor(Math.max(0, scoreValue) / PHASE_INTERVAL);
       }
 
       function triggerPhaseShift(phaseIndex) {
-        triggerBanner(`PHASE ${phaseIndex + 1}`, (192 + phaseIndex * 26) % 360, 66);
-        emitItemBurst(WIDTH * 0.5, HEIGHT * 0.22, `hsla(${(210 + phaseIndex * 24) % 360}, 95%, 68%, 1)`, 56);
+        const hue = (210 + phaseIndex * 48) % 360;
+        phaseShiftHue = hue;
+        phaseShiftFrames = 34;
+        triggerBanner(`PHASE ${phaseIndex + 1}`, hue, 66);
+        emitItemBurst(WIDTH * 0.5, HEIGHT * 0.22, `hsla(${hue}, 95%, 68%, 1)`, 70);
         playPhaseUpSfx();
       }
 
@@ -2183,6 +2254,69 @@
         const dy = player.y - item.y;
         const hitRadius = radius + item.r;
         return dx * dx + dy * dy <= hitRadius * hitRadius;
+      }
+
+      function startEnding() {
+        if (state !== "running") return;
+
+        stopBgm();
+        state = "ending";
+        syncUiState();
+        endingFrames = 0;
+        endingCatchPlayed = false;
+        tutorialStartFrame = 0;
+
+        // Clear hazards for the ending cutscene.
+        obstacles = [];
+        items = [];
+        comboCount = 0;
+        comboExpireFrame = 0;
+
+        // Big "boom" at max score.
+        phaseShiftHue = 52;
+        phaseShiftFrames = 40;
+        triggerBanner(`MAX ${FINAL_SCORE}!`, 52, 92);
+        emitItemBurst(player.x, player.y, "hsla(49, 96%, 62%, 1)", 120);
+        playFinaleSfx();
+      }
+
+      function updateEnding() {
+        endingFrames += 1;
+
+        // Float player towards the center for the cutscene.
+        const targetY = HEIGHT * 0.46;
+        player.y += (targetY - player.y) * 0.03;
+        player.vy *= 0.92;
+        player.rotation *= 0.92;
+
+        if (!endingCatchPlayed && endingFrames > 46) {
+          endingCatchPlayed = true;
+          playCatchSfx();
+        }
+
+        if (endingFrames > 170) {
+          finishClear();
+        }
+      }
+
+      function finishClear() {
+        if (state !== "ending") return;
+
+        const isNewRecord = score > highScore;
+        if (isNewRecord) {
+          highScore = score;
+          localStorage.setItem(SCORE_KEY, String(highScore));
+          highScoreEl.textContent = String(highScore);
+        }
+        const latestEntry = registerRanking();
+        void syncOnlineRankingWithEntry(latestEntry);
+        renderRanking();
+
+        const message = `300/300達成！人間に捕まった…でもめでたしめでたし。${currentName} のスコア: ${score}`;
+        state = "gameover";
+        syncUiState();
+        showGameOverScreen(message, isNewRecord, score, "clear");
+        playClearSfx();
       }
 
       function finishGame(reason = "スコア") {
@@ -2473,36 +2607,52 @@
         drawItems();
         drawTrail();
         drawPlayer();
+        drawEndingScene();
         drawCelebration();
         drawTutorialHint();
         drawCountdown();
       }
 
       function drawBackground() {
-        const phaseHue = (217 + currentPhase * 16) % 360;
+        const phaseHue = (212 + currentPhase * 38) % 360;
+        const hueMid = (phaseHue + 14) % 360;
+        const hueDeep = (phaseHue + 28) % 360;
         const grad = ctx.createLinearGradient(0, 0, 0, HEIGHT);
-        grad.addColorStop(0, `hsl(${phaseHue} 64% 8%)`);
-        grad.addColorStop(0.55, `hsl(${(phaseHue + 11) % 360} 58% 11%)`);
-        grad.addColorStop(1, `hsl(${(phaseHue + 19) % 360} 53% 13%)`);
+        grad.addColorStop(0, `hsl(${phaseHue} 70% 7%)`);
+        grad.addColorStop(0.55, `hsl(${hueMid} 62% 10%)`);
+        grad.addColorStop(1, `hsl(${hueDeep} 56% 13%)`);
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
         for (const star of stars) {
-          ctx.fillStyle = `rgba(148, 163, 184, ${star.a})`;
+          ctx.fillStyle = `hsla(${(phaseHue + 200) % 360}, 55%, 86%, ${star.a})`;
           ctx.beginPath();
           ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
           ctx.fill();
         }
 
-        const glow = ctx.createRadialGradient(130, 70, 30, 160, 120, 390);
-        glow.addColorStop(0, `hsla(${(phaseHue + 24) % 360}, 90%, 64%, 0.26)`);
-        glow.addColorStop(1, `hsla(${(phaseHue + 24) % 360}, 90%, 64%, 0)`);
-        ctx.fillStyle = glow;
+        const glow1 = ctx.createRadialGradient(WIDTH * 0.18, HEIGHT * 0.14, 30, WIDTH * 0.22, HEIGHT * 0.22, 430);
+        glow1.addColorStop(0, `hsla(${(phaseHue + 26) % 360}, 92%, 66%, 0.22)`);
+        glow1.addColorStop(1, `hsla(${(phaseHue + 26) % 360}, 92%, 66%, 0)`);
+        ctx.fillStyle = glow1;
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+        const glow2 = ctx.createRadialGradient(WIDTH * 0.86, HEIGHT * 0.86, 24, WIDTH * 0.8, HEIGHT * 0.78, 380);
+        glow2.addColorStop(0, `hsla(${(phaseHue + 310) % 360}, 92%, 66%, 0.14)`);
+        glow2.addColorStop(1, `hsla(${(phaseHue + 310) % 360}, 92%, 66%, 0)`);
+        ctx.fillStyle = glow2;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+        if (phaseShiftFrames > 0) {
+          const t = phaseShiftFrames / 34;
+          ctx.fillStyle = `hsla(${phaseShiftHue}, 95%, 64%, ${t * 0.22})`;
+          ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        }
       }
 
       function drawGrid() {
-        ctx.strokeStyle = "rgba(100, 116, 139, 0.22)";
+        const phaseHue = (212 + currentPhase * 38) % 360;
+        ctx.strokeStyle = `hsla(${(phaseHue + 210) % 360}, 40%, 70%, 0.14)`;
         ctx.lineWidth = 1;
         for (let y = 0; y <= HEIGHT; y += 45) {
           ctx.beginPath();
@@ -2747,13 +2897,16 @@
         const collisionRadius = getCurrentCollisionRadius();
         const auraRadius = 16 + collisionRadius * 0.9;
         const mobileScale = isMobileViewport ? MOBILE_RENDER_SCALE : 1;
-        const renderScale = (isShrinkActive() ? 0.76 : 1) * mobileScale;
+        const isEnding = state === "ending";
+        const endingProgress = isEnding ? clamp(endingFrames / 170, 0, 1) : 0;
+        const renderScale = (isShrinkActive() ? 0.76 : 1) * mobileScale * (isEnding ? 1 - endingProgress * 0.5 : 1);
         const invincible = isInvincibleActive();
         const skinImage = getSkinImage(currentSkin.id);
 
         ctx.save();
         ctx.translate(player.x, player.y);
         ctx.rotate(player.rotation);
+        ctx.globalAlpha = isEnding ? 1 - endingProgress * 0.35 : 1;
 
         ctx.fillStyle = invincible ? "rgba(250, 204, 21, 0.32)" : currentSkin.aura;
         ctx.beginPath();
@@ -2768,13 +2921,15 @@
           ctx.stroke();
         }
 
-        ctx.strokeStyle = "rgba(226, 232, 240, 0.45)";
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 5]);
-        ctx.beginPath();
-        ctx.arc(0, 0, collisionRadius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        if (!isEnding) {
+          ctx.strokeStyle = "rgba(226, 232, 240, 0.45)";
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 5]);
+          ctx.beginPath();
+          ctx.arc(0, 0, collisionRadius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
 
         ctx.shadowColor = invincible ? "rgba(251, 191, 36, 0.98)" : currentSkin.glow;
         ctx.shadowBlur = 20;
@@ -2787,6 +2942,65 @@
           ctx.textBaseline = "middle";
           ctx.fillText(currentSkin.emoji, 0, 0);
         }
+        ctx.restore();
+      }
+
+      function drawEndingScene() {
+        if (state !== "ending") return;
+
+        const total = 170;
+        const t = clamp(endingFrames / total, 0, 1);
+        const catchT = clamp(endingFrames / 120, 0, 1);
+        const eased = 1 - Math.pow(1 - catchT, 3);
+
+        const netX = WIDTH + 150 - eased * (WIDTH * 0.72);
+        const netY = player.y + Math.sin(endingFrames * 0.08) * 6;
+        const netR = 60 + eased * 84;
+
+        ctx.save();
+
+        const vignette = ctx.createRadialGradient(WIDTH * 0.5, HEIGHT * 0.5, HEIGHT * 0.2, WIDTH * 0.5, HEIGHT * 0.5, HEIGHT);
+        vignette.addColorStop(0, "rgba(2, 6, 23, 0)");
+        vignette.addColorStop(1, `rgba(2, 6, 23, ${0.55 * t})`);
+        ctx.fillStyle = vignette;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+        ctx.strokeStyle = `rgba(226, 232, 240, ${0.22 + eased * 0.34})`;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.arc(netX, netY, netR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = `rgba(148, 163, 184, ${0.18 + eased * 0.26})`;
+        ctx.lineWidth = 1.4;
+        const strands = 9;
+        for (let i = 0; i < strands; i += 1) {
+          const ang = (i / strands) * Math.PI * 2 + endingFrames * 0.01;
+          ctx.beginPath();
+          ctx.moveTo(netX + Math.cos(ang) * netR, netY + Math.sin(ang) * netR);
+          ctx.lineTo(netX - Math.cos(ang) * netR, netY - Math.sin(ang) * netR);
+          ctx.stroke();
+        }
+
+        ctx.strokeStyle = `rgba(226, 232, 240, ${0.16 + eased * 0.22})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(netX + netR * 0.62, netY - netR * 0.62);
+        ctx.lineTo(WIDTH + 60, -60);
+        ctx.stroke();
+
+        // Hint of a "human" silhouette in the corner.
+        ctx.fillStyle = `rgba(2, 6, 23, ${0.4 + t * 0.35})`;
+        ctx.beginPath();
+        ctx.ellipse(WIDTH + 40, 40, 180, 90, -0.35, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.font = '800 34px "Avenir Next", "Hiragino Sans", sans-serif';
+        ctx.fillStyle = `hsla(49, 96%, 70%, ${0.18 + t * 0.58})`;
+        ctx.fillText("CAUGHT!", WIDTH * 0.5, HEIGHT * 0.92);
+
         ctx.restore();
       }
 
@@ -3029,6 +3243,25 @@
       function playGameOverSfx() {
         playTone(280, 0.16, 0.072, "sawtooth", 0, 120);
         playTone(120, 0.2, 0.054, "triangle", 0.12, 70);
+      }
+
+      function playFinaleSfx() {
+        playTone(92, 0.22, 0.09, "square", 0, 55);
+        playTone(180, 0.18, 0.08, "sawtooth", 0.05, 110);
+        playTone(420, 0.12, 0.065, "triangle", 0.12, 640);
+        playTone(1240, 0.11, 0.05, "triangle", 0.2, 1680);
+      }
+
+      function playCatchSfx() {
+        playTone(320, 0.16, 0.07, "sawtooth", 0, 120);
+        playTone(960, 0.06, 0.05, "triangle", 0.07, 720);
+      }
+
+      function playClearSfx() {
+        playTone(523.25, 0.12, 0.085, "triangle", 0, 659.25);
+        playTone(659.25, 0.12, 0.078, "triangle", 0.13, 783.99);
+        playTone(783.99, 0.14, 0.072, "triangle", 0.28, 1046.5);
+        playTone(1046.5, 0.18, 0.06, "sine", 0.45, 1318.5);
       }
 
       function clamp(value, min, max) {
