@@ -35,6 +35,10 @@
         linear-gradient(165deg, var(--bg-0), var(--bg-1) 45%, var(--bg-2));
     }
 
+    body.ui-menu {
+      overflow: hidden;
+    }
+
     .game-shell {
       width: min(980px, 100%);
       border: 1px solid var(--line);
@@ -451,7 +455,8 @@
       }
 
       .ranking-list {
-        max-height: 176px;
+        max-height: none;
+        overflow: visible;
       }
 
       .touch-controls {
@@ -497,16 +502,18 @@
         position: fixed;
         inset: 0;
         z-index: 90;
+        display: block;
         border-radius: 0;
         padding: calc(8px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom));
-        align-items: start;
-        justify-items: stretch;
+        overflow-y: auto;
+        overscroll-behavior: contain;
       }
 
       .start-panel {
         width: min(760px, 100%);
         margin: 0 auto;
-        max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px);
+        max-height: none;
+        overflow: visible;
       }
     }
 
@@ -972,7 +979,9 @@
 
       function syncUiState() {
         const playing = state === "running" || state === "countdown";
+        const menu = state === "menu";
         document.body.classList.toggle("ui-playing", playing);
+        document.body.classList.toggle("ui-menu", menu);
       }
 
       function spawnObstacle() {
